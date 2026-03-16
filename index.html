@@ -46153,7 +46153,9 @@ let dealerSortAsc = true;
 let tab6BalSortCol = 'disc', tab6BalSortAsc = false;
 let tab6SumSortCol = 'purity', tab6SumSortAsc = true;
 let tab7DealerSortCol = 'oudF', tab7DealerSortAsc = false;
+let tab7ValSortCol = 'oudFV', tab7ValSortAsc = false;
 let tab7SkuSortCol = 'oudF', tab7SkuSortAsc = false;
+let tab7SkuValSortCol = 'oudFV', tab7SkuValSortAsc = false;
 const OUD_LOCAL = { region:[], salesman:[], dealer:[], category:[], signal:[] };
 let oudMsRegion, oudMsSalesman, oudMsDealer, oudMsCategory, oudMsSignal;
 
@@ -46766,7 +46768,7 @@ function buildTab7() {
       <div class="chart-box"><h3>Stock Comparison by Category (VALUE)</h3><div class="chart-container"><canvas id="chart7d"></canvas></div></div>
     </div>
     <div class="card">
-      <h3 class="section-title">Dealer OUD Detail</h3>
+      <h3 class="section-title">Dealer OUD Detail (QTY)</h3>
       <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-start;padding:10px 12px;background:#E8EDF2;border-radius:6px;">
         <div class="ms-dropdown" id="oud-ms-region"></div>
         <div class="ms-dropdown" id="oud-ms-salesman"></div>
@@ -46813,6 +46815,46 @@ function buildTab7() {
           <th>Signal Change</th>
         </tr></thead><tbody id="tbl7oudVal"></tbody>
       </table></div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">SKU OUD Detail (QTY)</h3>
+      <div class="dealer-count" id="oudSkuCount"></div>
+      <div class="table-scroll" style="max-height:500px;"><table id="tbl7skuTable">
+        <thead><tr>
+          <th class="sortable" data-col="sku">SKU / Model</th>
+          <th class="sortable" data-col="className">Class</th>
+          <th class="sortable" data-col="category">Category</th>
+          <th class="sortable" data-col="stk">On-Hand Stock</th>
+          ${prev ? '<th class="sortable" data-col="oudP">OUD '+prev.label+'</th>' : ''}
+          <th class="sortable" data-col="oudL">OUD ${latest.label}</th>
+          ${prev ? '<th class="sortable" data-col="del">Delivered</th>' : ''}
+          <th class="sortable" data-col="adj">Adjusted Stock</th>
+          <th class="sortable" data-col="so">Feb SO</th>
+          <th class="sortable" data-col="mosOH">MOS (On-Hand)</th>
+          <th class="sortable" data-col="mosA">MOS (Adjusted)</th>
+          <th>Signal Change</th>
+        </tr></thead><tbody id="tbl7sku"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">SKU OUD Detail (VALUE)</h3>
+      <div class="dealer-count" id="oudSkuValCount"></div>
+      <div class="table-scroll" style="max-height:500px;"><table id="tbl7skuValTable">
+        <thead><tr>
+          <th class="sortable" data-col="sku">SKU / Model</th>
+          <th class="sortable" data-col="className">Class</th>
+          <th class="sortable" data-col="category">Category</th>
+          <th class="sortable" data-col="stkV">On-Hand Stock</th>
+          ${prev ? '<th class="sortable" data-col="oudPV">OUD '+prev.label+'</th>' : ''}
+          <th class="sortable" data-col="oudLV">OUD ${latest.label}</th>
+          ${prev ? '<th class="sortable" data-col="delV">Delivered</th>' : ''}
+          <th class="sortable" data-col="adjV">Adjusted Stock</th>
+          <th class="sortable" data-col="soV">Feb SO</th>
+          <th class="sortable" data-col="mosOH">MOS (On-Hand)</th>
+          <th class="sortable" data-col="mosA">MOS (Adjusted)</th>
+          <th>Signal Change</th>
+        </tr></thead><tbody id="tbl7skuVal"></tbody>
+      </table></div>
     </div>`;
     document.querySelectorAll('#tbl7oudTable th.sortable').forEach(th => {
         th.addEventListener('click', () => {
@@ -46825,8 +46867,24 @@ function buildTab7() {
     document.querySelectorAll('#tbl7oudValTable th.sortable').forEach(th => {
         th.addEventListener('click', () => {
             const col = th.getAttribute('data-col');
+            if (tab7ValSortCol === col) tab7ValSortAsc = !tab7ValSortAsc;
+            else { tab7ValSortCol = col; tab7ValSortAsc = true; }
+            renderTab7();
+        });
+    });
+    document.querySelectorAll('#tbl7skuTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-col');
             if (tab7SkuSortCol === col) tab7SkuSortAsc = !tab7SkuSortAsc;
             else { tab7SkuSortCol = col; tab7SkuSortAsc = true; }
+            renderTab7();
+        });
+    });
+    document.querySelectorAll('#tbl7skuValTable th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-col');
+            if (tab7SkuValSortCol === col) tab7SkuValSortAsc = !tab7SkuValSortAsc;
+            else { tab7SkuValSortCol = col; tab7SkuValSortAsc = true; }
             renderTab7();
         });
     });
@@ -47122,7 +47180,7 @@ function renderTab7() {
 
     // Dealer OUD Detail (VALUE) — same rows, same local filter, value columns
     const valRows = [...dealerRows];
-    const vsc = tab7SkuSortCol, vasc = tab7SkuSortAsc;
+    const vsc = tab7ValSortCol, vasc = tab7ValSortAsc;
     valRows.sort((a,b) => {
         let va, vb;
         if (['dealer','region','category'].includes(vsc)) { va = a.d[vsc]||''; vb = b.d[vsc]||''; }
@@ -47165,6 +47223,165 @@ function renderTab7() {
         <td class="num" ${totStyle}>${fmtVal(tvSo)}</td>
         <td class="num" ${totStyle}>${fmtRatio(tvMosOH)}</td>
         <td class="num" ${totStyle} style="font-weight:700;background:#E8EDF2;border-top:2px solid var(--navy);color:#2E75B6">${fmtRatio(tvMosA)}</td>
+        <td ${totStyle}></td></tr>`;
+
+    // ===== SKU OUD Detail =====
+    const rawSkuData = DATA.skuDetail.filter(d =>
+        (FILTERS.region.length === 0   || FILTERS.region.includes(d.region)) &&
+        (FILTERS.salesman.length === 0 || FILTERS.salesman.includes(d.salesman)) &&
+        (FILTERS.dealer.length === 0   || FILTERS.dealer.includes(d.dealer)) &&
+        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category))
+    );
+    const skuLookup = {};
+    rawSkuData.forEach(d => {
+        const key = d.dealer + '||' + d.sku;
+        if (!skuLookup[key]) skuLookup[key] = { sku:d.sku, className:d.className, category:d.category, dealer:d.dealer, region:d.region, salesman:d.salesman, jan:{stQty:0,stVal:0,soQty:0,soVal:0,stkQty:0,stkVal:0}, feb:{stQty:0,stVal:0,soQty:0,soVal:0,stkQty:0,stkVal:0} };
+        AGG_KEYS.forEach(k => { skuLookup[key].jan[k] += (d.jan[k]||0); skuLookup[key].feb[k] += (d.feb[k]||0); });
+    });
+
+    const filteredOudSku = oudSkuData.filter(d =>
+        (FILTERS.region.length === 0   || FILTERS.region.includes(d.region)) &&
+        (FILTERS.salesman.length === 0 || FILTERS.salesman.includes(d.salesman)) &&
+        (FILTERS.dealer.length === 0   || FILTERS.dealer.includes(d.dealer)) &&
+        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category))
+    );
+
+    // Aggregate OUD by SKU (across dealers)
+    const skuOudMap = {};
+    filteredOudSku.forEach(d => {
+        if (!skuOudMap[d.sku]) skuOudMap[d.sku] = { sku:d.sku, className:d.className||'', category:d.category, region:d.region, salesman:d.salesman||'', dealers:new Set() };
+        skuOudMap[d.sku].dealers.add(d.dealer);
+        weeks.forEach(w => {
+            if (!skuOudMap[d.sku][w.key]) skuOudMap[d.sku][w.key] = {qty:0, val:0};
+            skuOudMap[d.sku][w.key].qty += (d[w.key]?.qty || 0);
+            skuOudMap[d.sku][w.key].val += (d[w.key]?.val || 0);
+        });
+    });
+
+    // Also aggregate raw stock/SO by SKU
+    const skuStockMap = {};
+    rawSkuData.forEach(d => {
+        if (!skuStockMap[d.sku]) skuStockMap[d.sku] = { sku:d.sku, className:d.className, category:d.category, region:d.region, salesman:d.salesman||'', stk:0, stkV:0, so:0, soV:0 };
+        const cp = d[ck] || {};
+        skuStockMap[d.sku].stk += (cp.stkQty||0);
+        skuStockMap[d.sku].stkV += (cp.stkVal||0);
+        skuStockMap[d.sku].so += (cp.soQty||0);
+        skuStockMap[d.sku].soV += (cp.soVal||0);
+    });
+
+    const allSkuRows = Object.values(skuOudMap).map(d => {
+        const ss = skuStockMap[d.sku] || {stk:0,stkV:0,so:0,soV:0};
+        const oudF = d[fk]?.qty || 0, oudL = d[lk]?.qty || 0, oudP = pk ? (d[pk]?.qty || 0) : 0;
+        const oudFV = d[fk]?.val || 0, oudLV = d[lk]?.val || 0, oudPV = pk ? (d[pk]?.val || 0) : 0;
+        const del = oudF - oudL, delV = oudFV - oudLV;
+        const adj = ss.stk + oudF, adjV = ss.stkV + oudFV;
+        const mosOH = ss.so > 0 ? ss.stk / ss.so : null;
+        const mosA = ss.so > 0 ? adj / ss.so : null;
+        const sigOH = calcSignal({soQty:ss.so, stkQty:ss.stk});
+        const sigA = calcSignal({soQty:ss.so, stkQty:adj});
+        const sigChange = sigOH !== sigA ? `${sigOH} → ${sigA}` : '-';
+        return { d, sku:d.sku, className:d.className, category:d.category, stk:ss.stk, stkV:ss.stkV, so:ss.so, soV:ss.soV,
+                 oudF, oudL, oudP, del, adj, oudFV, oudLV, oudPV, delV, adjV, mosOH, mosA, sigOH, sigA, sigChange };
+    }).filter(r => r.oudF > 0 || r.oudL > 0);
+
+    // Apply same local filters
+    const skuRows = allSkuRows.filter(r =>
+        (!lfSearch || r.sku.toLowerCase().includes(lfSearch) || (r.d.dealers && [...r.d.dealers].some(dl => dl.toLowerCase().includes(lfSearch)))) &&
+        (OUD_LOCAL.region.length === 0   || OUD_LOCAL.region.includes(r.d.region)) &&
+        (OUD_LOCAL.salesman.length === 0 || OUD_LOCAL.salesman.includes(r.d.salesman)) &&
+        (OUD_LOCAL.category.length === 0 || OUD_LOCAL.category.includes(r.d.category)) &&
+        (OUD_LOCAL.signal.length === 0   || OUD_LOCAL.signal.includes(r.sigA))
+    );
+
+    // SKU QTY table
+    const ssc = tab7SkuSortCol, sasc = tab7SkuSortAsc;
+    skuRows.sort((a,b) => {
+        let va, vb;
+        if (['sku','className','category'].includes(ssc)) { va = a[ssc]||''; vb = b[ssc]||''; }
+        else { va = a[ssc]||0; vb = b[ssc]||0; }
+        const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+        return sasc ? cmp : -cmp;
+    });
+
+    set('oudSkuCount', `${skuRows.length} / ${allSkuRows.length} SKUs with OUD`);
+    document.getElementById('tbl7sku').innerHTML = skuRows.map(r => {
+        const sigBadge = r.sigChange !== '-'
+            ? `<span class="signal-badge signal-${r.sigOH}" style="font-size:9px">${r.sigOH}</span> → <span class="signal-badge signal-${r.sigA}" style="font-size:9px">${r.sigA}</span>`
+            : '-';
+        return `<tr>
+            <td class="txt">${r.sku}</td><td class="txt">${r.className}</td><td class="txt">${r.category}</td>
+            <td class="num">${fmtNum(r.stk)}</td>
+            ${pk ? '<td class="num">'+fmtNum(r.oudP)+'</td>' : ''}
+            <td class="num">${fmtNum(r.oudL)}</td>
+            ${pk ? '<td class="num" style="color:var(--opportunity);font-weight:600">'+fmtNum(r.del)+'</td>' : ''}
+            <td class="num" style="font-weight:700">${fmtNum(r.adj)}</td>
+            <td class="num">${fmtNum(r.so)}</td>
+            <td class="num">${fmtRatio(r.mosOH)}</td>
+            <td class="num" style="color:#2E75B6;font-weight:600">${fmtRatio(r.mosA)}</td>
+            <td class="ctr">${sigBadge}</td></tr>`;
+    }).join('');
+
+    // SKU QTY totals
+    const tsStk=skuRows.reduce((s,r)=>s+r.stk,0), tsOudP=skuRows.reduce((s,r)=>s+r.oudP,0);
+    const tsOudL=skuRows.reduce((s,r)=>s+r.oudL,0), tsDel=skuRows.reduce((s,r)=>s+r.del,0);
+    const tsAdj=skuRows.reduce((s,r)=>s+r.adj,0), tsSo=skuRows.reduce((s,r)=>s+r.so,0);
+    const tsMosOH=tsSo>0?tsStk/tsSo:null, tsMosA=tsSo>0?tsAdj/tsSo:null;
+    document.getElementById('tbl7sku').innerHTML += `<tr>
+        <td class="txt" ${totStyle}>TOTAL</td><td ${totStyle}></td><td ${totStyle}></td>
+        <td class="num" ${totStyle}>${fmtNum(tsStk)}</td>
+        ${pk?'<td class="num" '+totStyle+'>'+fmtNum(tsOudP)+'</td>':''}
+        <td class="num" ${totStyle}>${fmtNum(tsOudL)}</td>
+        ${pk?'<td class="num" '+totStyle+' style="font-weight:700;background:#E8EDF2;border-top:2px solid var(--navy);color:var(--opportunity)">'+fmtNum(tsDel)+'</td>':''}
+        <td class="num" ${totStyle}>${fmtNum(tsAdj)}</td>
+        <td class="num" ${totStyle}>${fmtNum(tsSo)}</td>
+        <td class="num" ${totStyle}>${fmtRatio(tsMosOH)}</td>
+        <td class="num" ${totStyle} style="font-weight:700;background:#E8EDF2;border-top:2px solid var(--navy);color:#2E75B6">${fmtRatio(tsMosA)}</td>
+        <td ${totStyle}></td></tr>`;
+
+    // SKU VALUE table
+    const skuValRows = [...skuRows];
+    const svsc = tab7SkuValSortCol, svasc = tab7SkuValSortAsc;
+    skuValRows.sort((a,b) => {
+        let va, vb;
+        if (['sku','className','category'].includes(svsc)) { va = a[svsc]||''; vb = b[svsc]||''; }
+        else { va = a[svsc]||0; vb = b[svsc]||0; }
+        const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+        return svasc ? cmp : -cmp;
+    });
+
+    set('oudSkuValCount', `${skuValRows.length} / ${allSkuRows.length} SKUs with OUD`);
+    document.getElementById('tbl7skuVal').innerHTML = skuValRows.map(r => {
+        const sigBadge = r.sigChange !== '-'
+            ? `<span class="signal-badge signal-${r.sigOH}" style="font-size:9px">${r.sigOH}</span> → <span class="signal-badge signal-${r.sigA}" style="font-size:9px">${r.sigA}</span>`
+            : '-';
+        return `<tr>
+            <td class="txt">${r.sku}</td><td class="txt">${r.className}</td><td class="txt">${r.category}</td>
+            <td class="num">${fmtVal(r.stkV)}</td>
+            ${pk ? '<td class="num">'+fmtVal(r.oudPV)+'</td>' : ''}
+            <td class="num">${fmtVal(r.oudLV)}</td>
+            ${pk ? '<td class="num" style="color:var(--opportunity);font-weight:600">'+fmtVal(r.delV)+'</td>' : ''}
+            <td class="num" style="font-weight:700">${fmtVal(r.adjV)}</td>
+            <td class="num">${fmtVal(r.soV)}</td>
+            <td class="num">${fmtRatio(r.mosOH)}</td>
+            <td class="num" style="color:#2E75B6;font-weight:600">${fmtRatio(r.mosA)}</td>
+            <td class="ctr">${sigBadge}</td></tr>`;
+    }).join('');
+
+    // SKU VALUE totals
+    const tsvStk=skuValRows.reduce((s,r)=>s+r.stkV,0), tsvOudP=skuValRows.reduce((s,r)=>s+r.oudPV,0);
+    const tsvOudL=skuValRows.reduce((s,r)=>s+r.oudLV,0), tsvDel=skuValRows.reduce((s,r)=>s+r.delV,0);
+    const tsvAdj=skuValRows.reduce((s,r)=>s+r.adjV,0), tsvSo=skuValRows.reduce((s,r)=>s+r.soV,0);
+    const tsvMosOH=tsSo>0?tsStk/tsSo:null, tsvMosA=tsSo>0?tsAdj/tsSo:null;
+    document.getElementById('tbl7skuVal').innerHTML += `<tr>
+        <td class="txt" ${totStyle}>TOTAL</td><td ${totStyle}></td><td ${totStyle}></td>
+        <td class="num" ${totStyle}>${fmtVal(tsvStk)}</td>
+        ${pk?'<td class="num" '+totStyle+'>'+fmtVal(tsvOudP)+'</td>':''}
+        <td class="num" ${totStyle}>${fmtVal(tsvOudL)}</td>
+        ${pk?'<td class="num" '+totStyle+' style="font-weight:700;background:#E8EDF2;border-top:2px solid var(--navy);color:var(--opportunity)">'+fmtVal(tsvDel)+'</td>':''}
+        <td class="num" ${totStyle}>${fmtVal(tsvAdj)}</td>
+        <td class="num" ${totStyle}>${fmtVal(tsvSo)}</td>
+        <td class="num" ${totStyle}>${fmtRatio(tsvMosOH)}</td>
+        <td class="num" ${totStyle} style="font-weight:700;background:#E8EDF2;border-top:2px solid var(--navy);color:#2E75B6">${fmtRatio(tsvMosA)}</td>
         <td ${totStyle}></td></tr>`;
 }
 
