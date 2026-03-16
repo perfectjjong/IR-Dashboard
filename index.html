@@ -47226,31 +47226,34 @@ function renderTab7() {
         <td ${totStyle}></td></tr>`;
 
     // ===== SKU OUD Detail =====
-    const rawSkuData = DATA.skuDetail.filter(d =>
+    // Apply BOTH global + local filters BEFORE aggregation so totals match Dealer tables
+    const rawSkuFiltered = DATA.skuDetail.filter(d =>
         (FILTERS.region.length === 0   || FILTERS.region.includes(d.region)) &&
         (FILTERS.salesman.length === 0 || FILTERS.salesman.includes(d.salesman)) &&
         (FILTERS.dealer.length === 0   || FILTERS.dealer.includes(d.dealer)) &&
-        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category))
+        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category)) &&
+        (OUD_LOCAL.region.length === 0   || OUD_LOCAL.region.includes(d.region)) &&
+        (OUD_LOCAL.salesman.length === 0 || OUD_LOCAL.salesman.includes(d.salesman)) &&
+        (OUD_LOCAL.dealer.length === 0   || OUD_LOCAL.dealer.includes(d.dealer)) &&
+        (OUD_LOCAL.category.length === 0 || OUD_LOCAL.category.includes(d.category)) &&
+        (!lfSearch || d.sku.toLowerCase().includes(lfSearch) || d.dealer.toLowerCase().includes(lfSearch))
     );
-    const skuLookup = {};
-    rawSkuData.forEach(d => {
-        const key = d.dealer + '||' + d.sku;
-        if (!skuLookup[key]) skuLookup[key] = { sku:d.sku, className:d.className, category:d.category, dealer:d.dealer, region:d.region, salesman:d.salesman, jan:{stQty:0,stVal:0,soQty:0,soVal:0,stkQty:0,stkVal:0}, feb:{stQty:0,stVal:0,soQty:0,soVal:0,stkQty:0,stkVal:0} };
-        AGG_KEYS.forEach(k => { skuLookup[key].jan[k] += (d.jan[k]||0); skuLookup[key].feb[k] += (d.feb[k]||0); });
-    });
 
-    const filteredOudSku = oudSkuData.filter(d =>
+    const oudSkuFiltered = oudSkuData.filter(d =>
         (FILTERS.region.length === 0   || FILTERS.region.includes(d.region)) &&
         (FILTERS.salesman.length === 0 || FILTERS.salesman.includes(d.salesman)) &&
         (FILTERS.dealer.length === 0   || FILTERS.dealer.includes(d.dealer)) &&
-        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category))
+        (FILTERS.category.length === 0 || FILTERS.category.includes(d.category)) &&
+        (OUD_LOCAL.region.length === 0   || OUD_LOCAL.region.includes(d.region)) &&
+        (OUD_LOCAL.salesman.length === 0 || OUD_LOCAL.salesman.includes(d.salesman)) &&
+        (OUD_LOCAL.dealer.length === 0   || OUD_LOCAL.dealer.includes(d.dealer)) &&
+        (OUD_LOCAL.category.length === 0 || OUD_LOCAL.category.includes(d.category))
     );
 
-    // Aggregate OUD by SKU (across dealers)
+    // Aggregate OUD by SKU (after filters applied)
     const skuOudMap = {};
-    filteredOudSku.forEach(d => {
-        if (!skuOudMap[d.sku]) skuOudMap[d.sku] = { sku:d.sku, className:d.className||'', category:d.category, region:d.region, salesman:d.salesman||'', dealers:new Set() };
-        skuOudMap[d.sku].dealers.add(d.dealer);
+    oudSkuFiltered.forEach(d => {
+        if (!skuOudMap[d.sku]) skuOudMap[d.sku] = { sku:d.sku, className:d.className||'', category:d.category, region:d.region, salesman:d.salesman||'' };
         weeks.forEach(w => {
             if (!skuOudMap[d.sku][w.key]) skuOudMap[d.sku][w.key] = {qty:0, val:0};
             skuOudMap[d.sku][w.key].qty += (d[w.key]?.qty || 0);
@@ -47258,9 +47261,9 @@ function renderTab7() {
         });
     });
 
-    // Also aggregate raw stock/SO by SKU
+    // Aggregate raw stock/SO by SKU (after filters applied)
     const skuStockMap = {};
-    rawSkuData.forEach(d => {
+    rawSkuFiltered.forEach(d => {
         if (!skuStockMap[d.sku]) skuStockMap[d.sku] = { sku:d.sku, className:d.className, category:d.category, region:d.region, salesman:d.salesman||'', stk:0, stkV:0, so:0, soV:0 };
         const cp = d[ck] || {};
         skuStockMap[d.sku].stk += (cp.stkQty||0);
@@ -47269,8 +47272,12 @@ function renderTab7() {
         skuStockMap[d.sku].soV += (cp.soVal||0);
     });
 
-    const allSkuRows = Object.values(skuOudMap).map(d => {
-        const ss = skuStockMap[d.sku] || {stk:0,stkV:0,so:0,soV:0};
+    // Total SKU count (before signal filter)
+    const allSkuKeys = new Set([...Object.keys(skuOudMap), ...Object.keys(skuStockMap)]);
+    const allSkuRows = [...allSkuKeys].map(sku => {
+        const d = skuOudMap[sku] || { sku, className:'', category:'', region:'', salesman:'' };
+        const ss = skuStockMap[sku] || {stk:0,stkV:0,so:0,soV:0,className:'',category:''};
+        if (!d.className && ss.className) { d.className = ss.className; d.category = ss.category; }
         const oudF = d[fk]?.qty || 0, oudL = d[lk]?.qty || 0, oudP = pk ? (d[pk]?.qty || 0) : 0;
         const oudFV = d[fk]?.val || 0, oudLV = d[lk]?.val || 0, oudPV = pk ? (d[pk]?.val || 0) : 0;
         const del = oudF - oudL, delV = oudFV - oudLV;
@@ -47280,17 +47287,14 @@ function renderTab7() {
         const sigOH = calcSignal({soQty:ss.so, stkQty:ss.stk});
         const sigA = calcSignal({soQty:ss.so, stkQty:adj});
         const sigChange = sigOH !== sigA ? `${sigOH} → ${sigA}` : '-';
-        return { d, sku:d.sku, className:d.className, category:d.category, stk:ss.stk, stkV:ss.stkV, so:ss.so, soV:ss.soV,
+        return { d, sku:d.sku||sku, className:d.className||ss.className||'', category:d.category||ss.category||'',
+                 stk:ss.stk, stkV:ss.stkV, so:ss.so, soV:ss.soV,
                  oudF, oudL, oudP, del, adj, oudFV, oudLV, oudPV, delV, adjV, mosOH, mosA, sigOH, sigA, sigChange };
     }).filter(r => r.oudF > 0 || r.oudL > 0);
 
-    // Apply same local filters
+    // Apply signal filter only (other filters already applied above)
     const skuRows = allSkuRows.filter(r =>
-        (!lfSearch || r.sku.toLowerCase().includes(lfSearch) || (r.d.dealers && [...r.d.dealers].some(dl => dl.toLowerCase().includes(lfSearch)))) &&
-        (OUD_LOCAL.region.length === 0   || OUD_LOCAL.region.includes(r.d.region)) &&
-        (OUD_LOCAL.salesman.length === 0 || OUD_LOCAL.salesman.includes(r.d.salesman)) &&
-        (OUD_LOCAL.category.length === 0 || OUD_LOCAL.category.includes(r.d.category)) &&
-        (OUD_LOCAL.signal.length === 0   || OUD_LOCAL.signal.includes(r.sigA))
+        (OUD_LOCAL.signal.length === 0 || OUD_LOCAL.signal.includes(r.sigA))
     );
 
     // SKU QTY table
